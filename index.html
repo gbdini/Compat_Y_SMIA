@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analyseur de Compatibilités Médicamenteuses en Y</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --border: #e2e8f0;
+      
+      /* Statuts UI */
+      --status-c-bg: #dcfce7;
+      --status-c-text: #15803d;
+      --status-i-bg: #fee2e2;
+      --status-i-text: #b91c1c;
+      --status-nd-bg: #fef3c7;
+      --status-nd-text: #b45309;
+      --status-mix-bg: #ffedd5;
+      --status-mix-text: #c2410c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* La carte de la matrice prend toute la largeur disponible */
+    .card-full {
+      max-width: 100% !important;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: #1e293b;
+    }
+
+    h3 {
+      font-size: 1.1rem;
+      color: #334155;
+      margin-bottom: 0.75rem;
+    }
+
+    p.subtitle {
+      color: #64748b;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Champ de recherche & Autocomplétion */
+    .search-container {
+      position: relative;
+      margin-bottom: 1rem;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--primary);
+    }
+
+    .suggestions-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1000;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      display: none;
+    }
+
+    .suggestion-item {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover { background-color: #f1f5f9; }
+
+    /* Badges / Sélection */
+    .selected-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      min-height: 38px;
+    }
+
+    .tag {
+      background: #eff6ff;
+      color: #1e40af;
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 1px solid #bfdbfe;
+    }
+
+    .tag button {
+      background: none;
+      border: none;
+      color: #1e40af;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    /* Boutons */
+    .btn-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.8rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-primary:disabled { background: #cbd5e1; cursor: not-allowed; }
+
+    .btn-secondary {
+      width: 100%;
+      background: #64748b;
+      color: white;
+      border: none;
+      padding: 0.8rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-secondary:hover { background: #475569; }
+
+    /* Zone de Résultat Analyse */
+    .result-banner {
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 1.5rem;
+      display: none;
+    }
+
+    .banner-C { background: var(--status-c-bg); color: var(--status-c-text); border: 1px solid #bbf7d0; }
+    .banner-I { background: var(--status-i-bg); color: var(--status-i-text); border: 1px solid #fca5a5; }
+    .banner-ND { background: var(--status-nd-bg); color: var(--status-nd-text); border: 1px solid #fde68a; }
+    .banner-I_ND { background: var(--status-mix-bg); color: var(--status-mix-text); border: 1px solid #ffedd5; }
+
+    /* Tableau des paires (Résultat Analyse) */
+    .pairs-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+
+    .pairs-table th, .pairs-table td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pairs-table th {
+      background-color: #f8fafc;
+      color: #475569;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .pill-C { background: var(--status-c-bg); color: var(--status-c-text); }
+    .pill-I { background: var(--status-i-bg); color: var(--status-i-text); }
+    .pill-ND { background: var(--status-nd-bg); color: var(--status-nd-text); }
+
+    /* ==========================================
+       NOUVEAUX STYLES DE LA MATRICE PLEINE LARGEUR
+       ========================================== */
+    .matrix-container {
+      width: 100%;
+      overflow-x: auto; /* Défilement horizontal léger si l'écran est petit */
+      margin-top: 1rem;
+    }
+
+    .matrix-table {
+      border-collapse: separate;
+      border-spacing: 1px;
+      font-size: 0.65rem;
+      background-color: #cbd5e1;
+      margin: 0 auto;
+    }
+
+    .matrix-table th, .matrix-table td {
+      width: 20px;
+      height: 20px;
+      min-width: 20px;
+      text-align: center;
+      vertical-align: middle;
+      padding: 0;
+    }
+
+    /* Alignement vertical des en-têtes de colonnes */
+    .matrix-table th.col-header {
+      background-color: #f1f5f9;
+      font-weight: 600;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      padding: 8px 2px;
+      height: 120px;
+      white-space: nowrap;
+      font-size: 0.7rem;
+      color: #334155;
+    }
+
+    .matrix-table td.row-header {
+      background-color: #f1f5f9;
+      font-weight: 600;
+      text-align: right;
+      padding: 0 6px;
+      white-space: nowrap;
+      width: auto;
+      font-size: 0.7rem;
+      color: #334155;
+    }
+
+    /* Couleurs des cellules */
+    .cell-same { background-color: #94a3b8; color: transparent; }
+    .cell-C    { background-color: #22c55e; color: white; font-weight: bold; }
+    .cell-I    { background-color: #ef4444; color: white; font-weight: bold; }
+    .cell-ND   { background-color: #ffffff; color: transparent; }
+
+    /* Effet survol professionnel pour se repérer dans la grille */
+    .matrix-table tr:hover td {
+      filter: brightness(0.9);
+    }
+    
+    .matrix-table td:hover {
+      outline: 2px solid #000;
+      z-index: 10;
+      position: relative;
+    }
+
+    .matrix-legend {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .legend-box {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      border: 1px solid #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Carte 1 : Recherche et Actions -->
+  <div class="card">
+    <h1>Compatibilité Médicamenteuse en Y</h1>
+    <p class="subtitle">Sélectionnez 2 substances ou plus pour évaluer le mélange, ou génerer la matrice globale.</p>
+
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="Taper le nom d'une substance (ex: aciclovir)..." autocomplete="off">
+      <div id="suggestions" class="suggestions-list"></div>
+    </div>
+
+    <div id="selectedContainer" class="selected-tags"></div>
+
+    <div class="btn-container">
+      <button id="analyzeBtn" class="btn-primary" disabled>Lancer l'analyse</button>
+      <button id="toggleMatrixBtn" class="btn-secondary">Générer la matrice globale</button>
+    </div>
+  </div>
+
+  <!-- Carte 2 : Résultat de l'analyse ciblée -->
+  <div id="resultCard" class="card" style="display: none;">
+    <div id="resultBanner" class="result-banner"></div>
+    
+    <h3>Détail des combinaisons</h3>
+    <table class="pairs-table">
+      <thead>
+        <tr>
+          <th>Couple de substances</th>
+          <th>Statut de compatibilité</th>
+        </tr>
+      </thead>
+      <tbody id="pairsTableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Carte 3 : Matrice globale (Pleine largeur) -->
+  <div id="matrixCard" class="card card-full" style="display: none;">
+    <h3>Matrice globale des compatibilités</h3>
+    
+    <div class="matrix-legend">
+      <div class="legend-item"><div class="legend-box cell-C"></div> Compatible (C)</div>
+      <div class="legend-item"><div class="legend-box cell-I"></div> Incompatible (I)</div>
+      <div class="legend-item"><div class="legend-box cell-same"></div> Même substance</div>
+      <div class="legend-item"><div class="legend-box cell-ND"></div> Non renseigné</div>
+    </div>
+
+    <div class="matrix-container">
+      <table class="matrix-table">
+        <thead id="matrixHead"></thead>
+        <tbody id="matrixBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ==========================================
+  // 1. BASE DE DONNÉES
+  // Remplacer ce tableau par vos 979 lignes réelles
+  // ==========================================
+  const rawData = [
+  { Substance_A: "aciclovir", Substance_B: "amikacine", Clé_couple: "aciclovir_amikacine", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "ceftazidime", Clé_couple: "aciclovir_ceftazidime", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "ceftriaxone", Clé_couple: "aciclovir_ceftriaxone", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "erythromycine", Clé_couple: "aciclovir_erythromycine", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "fluconazole", Clé_couple: "aciclovir_fluconazole", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "gentamicine", Clé_couple: "aciclovir_gentamicine", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "imipenem/cilastatine", Clé_couple: "aciclovir_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "magnesium sulfate", Clé_couple: "aciclovir_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "métronidazole", Clé_couple: "aciclovir_métronidazole", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "milrinone", Clé_couple: "aciclovir_milrinone", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "propofol", Clé_couple: "aciclovir_propofol", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "sodium bicarbonate", Clé_couple: "aciclovir_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "triméthoprime/sulfaméthoxazole", Clé_couple: "aciclovir_triméthoprime/sulfaméthoxazole", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "vancomycine", Clé_couple: "aciclovir_vancomycine", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_aciclovir", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_aciclovir", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_aciclovir", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_aciclovir", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "amikacine", Clé_couple: "adrénaline_amikacine", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "amiodarone", Clé_couple: "adrénaline_amiodarone", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "ceftazidime", Clé_couple: "adrénaline_ceftazidime", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "ceftriaxone", Clé_couple: "adrénaline_ceftriaxone", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "dlitiazem", Clé_couple: "adrénaline_dlitiazem", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "dobutamine", Clé_couple: "adrénaline_dobutamine", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "erythromycine", Clé_couple: "adrénaline_erythromycine", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "esmolol", Clé_couple: "adrénaline_esmolol", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "fentanyl", Clé_couple: "adrénaline_fentanyl", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "fluconazole", Clé_couple: "adrénaline_fluconazole", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "gentamicine", Clé_couple: "adrénaline_gentamicine", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "héparine", Clé_couple: "adrénaline_héparine", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "imipenem/cilastatine", Clé_couple: "adrénaline_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "labetalol", Clé_couple: "adrénaline_labetalol", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "lidocaïne", Clé_couple: "adrénaline_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "magnesium sulfate", Clé_couple: "adrénaline_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "metoprolol", Clé_couple: "adrénaline_metoprolol", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "métronidazole", Clé_couple: "adrénaline_métronidazole", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "midazolam", Clé_couple: "adrénaline_midazolam", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "milrinone", Clé_couple: "adrénaline_milrinone", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "morphine HCl", Clé_couple: "adrénaline_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "naloxone", Clé_couple: "adrénaline_naloxone", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "nicardipine", Clé_couple: "adrénaline_nicardipine", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "nitroglycérine", Clé_couple: "adrénaline_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "noradrénaline", Clé_couple: "adrénaline_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "ondansetron", Clé_couple: "adrénaline_ondansetron", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "potassium chlorure", Clé_couple: "adrénaline_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "propofol", Clé_couple: "adrénaline_propofol", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "sufentanil", Clé_couple: "adrénaline_sufentanil", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "vancomycine", Clé_couple: "adrénaline_vancomycine", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: "vasopressine", Clé_couple: "adrénaline_vasopressine", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_adrénaline", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_adrénaline", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_adrénaline", Compatibilité: "C" },
+  { Substance_A: "adrénaline", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_adrénaline", Compatibilité: "C" },
+  { Substance_A: "albumine", Substance_B: "dlitiazem", Clé_couple: "albumine_dlitiazem", Compatibilité: "C" },
+  { Substance_A: "albumine", Substance_B: "furosémide", Clé_couple: "albumine_furosémide", Compatibilité: "C" },
+  { Substance_A: "albumine", Substance_B: "nimodipine", Clé_couple: "albumine_nimodipine", Compatibilité: "C" },
+  { Substance_A: "albumine", Substance_B: "potassium chlorure", Clé_couple: "albumine_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "albumine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_albumine", Compatibilité: "C" },
+  { Substance_A: "albumine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_albumine", Compatibilité: "C" },
+  { Substance_A: "albumine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_albumine", Compatibilité: "C" },
+  { Substance_A: "albumine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_albumine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "adrénaline ", Clé_couple: "adrénaline _amikacine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "amiodarone", Clé_couple: "amikacine_amiodarone", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "ciprofloxacine", Clé_couple: "amikacine_ciprofloxacine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "dlitiazem", Clé_couple: "amikacine_dlitiazem", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "dobutamine", Clé_couple: "amikacine_dobutamine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "erythromycine", Clé_couple: "amikacine_erythromycine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "esmolol", Clé_couple: "amikacine_esmolol", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "fentanyl", Clé_couple: "amikacine_fentanyl", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "fluconazole", Clé_couple: "amikacine_fluconazole", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "furosémide", Clé_couple: "amikacine_furosémide", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "gentamicine", Clé_couple: "amikacine_gentamicine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "labetalol", Clé_couple: "amikacine_labetalol", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "lidocaïne", Clé_couple: "amikacine_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "magnesium sulfate", Clé_couple: "amikacine_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "metoprolol", Clé_couple: "amikacine_metoprolol", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "métronidazole", Clé_couple: "amikacine_métronidazole", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "midazolam", Clé_couple: "amikacine_midazolam", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "milrinone", Clé_couple: "amikacine_milrinone", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "morphine HCl", Clé_couple: "amikacine_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "naloxone", Clé_couple: "amikacine_naloxone", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "nitroglycérine", Clé_couple: "amikacine_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "noradrénaline", Clé_couple: "amikacine_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "ondansetron", Clé_couple: "amikacine_ondansetron", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "potassium chlorure", Clé_couple: "amikacine_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "sodium bicarbonate", Clé_couple: "amikacine_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "sufentanil", Clé_couple: "amikacine_sufentanil", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "vancomycine", Clé_couple: "amikacine_vancomycine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: "vasopressine", Clé_couple: "amikacine_vasopressine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_amikacine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_amikacine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_amikacine", Compatibilité: "C" },
+  { Substance_A: "amikacine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_amikacine", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "adrénaline ", Clé_couple: "adrénaline _amiodarone", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "ceftriaxone", Clé_couple: "amiodarone_ceftriaxone", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "ciprofloxacine", Clé_couple: "amiodarone_ciprofloxacine", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "cisatracurium", Clé_couple: "amiodarone_cisatracurium", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "clarithromycine", Clé_couple: "amiodarone_clarithromycine", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "dobutamine", Clé_couple: "amiodarone_dobutamine", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "erythromycine", Clé_couple: "amiodarone_erythromycine", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "esmolol", Clé_couple: "amiodarone_esmolol", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "fentanyl", Clé_couple: "amiodarone_fentanyl", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "fluconazole", Clé_couple: "amiodarone_fluconazole", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "gentamicine", Clé_couple: "amiodarone_gentamicine", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "insuline rapide", Clé_couple: "amiodarone_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "labetalol", Clé_couple: "amiodarone_labetalol", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "lidocaïne", Clé_couple: "amiodarone_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "métronidazole", Clé_couple: "amiodarone_métronidazole", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "midazolam", Clé_couple: "amiodarone_midazolam", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "milrinone", Clé_couple: "amiodarone_milrinone", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "morphine HCl", Clé_couple: "amiodarone_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "nicardipine", Clé_couple: "amiodarone_nicardipine", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "nitroglycérine", Clé_couple: "amiodarone_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "noradrénaline", Clé_couple: "amiodarone_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "potassium chlorure", Clé_couple: "amiodarone_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "vancomycine", Clé_couple: "amiodarone_vancomycine", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: "vasopressine", Clé_couple: "amiodarone_vasopressine", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_amiodarone", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_amiodarone", Compatibilité: "C" },
+  { Substance_A: "amiodarone", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_amiodarone", Compatibilité: "C" },
+  { Substance_A: "amoxicilline", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_amoxicilline", Compatibilité: "C" },
+  { Substance_A: "amoxicilline", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_amoxicilline", Compatibilité: "C" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: "clarithromycine", Clé_couple: "amoxicilline/ac. clavulanique_clarithromycine", Compatibilité: "C" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: "potassium chlorure", Clé_couple: "amoxicilline/ac. clavulanique_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_amoxicilline/ac. clavulanique", Compatibilité: "C" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_amoxicilline/ac. clavulanique", Compatibilité: "C" },
+  { Substance_A: "bivalirudine", Substance_B: "clonidine", Clé_couple: "bivalirudine_clonidine", Compatibilité: "C" },
+  { Substance_A: "bivalirudine", Substance_B: "dlitiazem", Clé_couple: "bivalirudine_dlitiazem", Compatibilité: "C" },
+  { Substance_A: "bivalirudine", Substance_B: "fentanyl", Clé_couple: "bivalirudine_fentanyl", Compatibilité: "C" },
+  { Substance_A: "bivalirudine", Substance_B: "metoprolol", Clé_couple: "bivalirudine_metoprolol", Compatibilité: "C" },
+  { Substance_A: "bivalirudine", Substance_B: "midazolam", Clé_couple: "bivalirudine_midazolam", Compatibilité: "C" },
+  { Substance_A: "bivalirudine", Substance_B: "sufentanil", Clé_couple: "bivalirudine_sufentanil", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "adrénaline ", Clé_couple: "adrénaline _ceftazidime", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "ceftriaxone", Clé_couple: "ceftazidime_ceftriaxone", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "ciprofloxacine", Clé_couple: "ceftazidime_ciprofloxacine", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "dlitiazem", Clé_couple: "ceftazidime_dlitiazem", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "esmolol", Clé_couple: "ceftazidime_esmolol", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "fentanyl", Clé_couple: "ceftazidime_fentanyl", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "furosémide", Clé_couple: "ceftazidime_furosémide", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "héparine", Clé_couple: "ceftazidime_héparine", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "imipenem/cilastatine", Clé_couple: "ceftazidime_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "insuline rapide", Clé_couple: "ceftazidime_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "labetalol", Clé_couple: "ceftazidime_labetalol", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "magnesium sulfate", Clé_couple: "ceftazidime_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "métronidazole", Clé_couple: "ceftazidime_métronidazole", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "milrinone", Clé_couple: "ceftazidime_milrinone", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "morphine HCl", Clé_couple: "ceftazidime_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "naloxone", Clé_couple: "ceftazidime_naloxone", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "nitroglycérine", Clé_couple: "ceftazidime_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "noradrénaline", Clé_couple: "ceftazidime_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "ondansetron", Clé_couple: "ceftazidime_ondansetron", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "potassium chlorure", Clé_couple: "ceftazidime_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "sufentanil", Clé_couple: "ceftazidime_sufentanil", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: "vasopressine", Clé_couple: "ceftazidime_vasopressine", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_ceftazidime", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_ceftazidime", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_ceftazidime", Compatibilité: "C" },
+  { Substance_A: "ceftazidime", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_ceftazidime", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "adrénaline ", Clé_couple: "adrénaline _ceftriaxone", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "dlitiazem", Clé_couple: "ceftriaxone_dlitiazem", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "erythromycine", Clé_couple: "ceftriaxone_erythromycine", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "esmolol", Clé_couple: "ceftriaxone_esmolol", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "fentanyl", Clé_couple: "ceftriaxone_fentanyl", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "furosémide", Clé_couple: "ceftriaxone_furosémide", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "héparine", Clé_couple: "ceftriaxone_héparine", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "insuline rapide", Clé_couple: "ceftriaxone_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "lidocaïne", Clé_couple: "ceftriaxone_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "metoprolol", Clé_couple: "ceftriaxone_metoprolol", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "midazolam", Clé_couple: "ceftriaxone_midazolam", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "morphine HCl", Clé_couple: "ceftriaxone_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "naloxone", Clé_couple: "ceftriaxone_naloxone", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "nitroglycérine", Clé_couple: "ceftriaxone_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "noradrénaline", Clé_couple: "ceftriaxone_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "ondansetron", Clé_couple: "ceftriaxone_ondansetron", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "potassium chlorure", Clé_couple: "ceftriaxone_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "propofol", Clé_couple: "ceftriaxone_propofol", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "sodium bicarbonate", Clé_couple: "ceftriaxone_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "sufentanil", Clé_couple: "ceftriaxone_sufentanil", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: "vasopressine", Clé_couple: "ceftriaxone_vasopressine", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_ceftriaxone", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_ceftriaxone", Compatibilité: "C" },
+  { Substance_A: "ceftriaxone", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_ceftriaxone", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: "clarithromycine", Clé_couple: "ciprofloxacine_clarithromycine", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: "dlitiazem", Clé_couple: "ciprofloxacine_dlitiazem", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: "gentamicine", Clé_couple: "ciprofloxacine_gentamicine", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: "lidocaïne", Clé_couple: "ciprofloxacine_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: "métronidazole", Clé_couple: "ciprofloxacine_métronidazole", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: "midazolam", Clé_couple: "ciprofloxacine_midazolam", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: "noradrénaline", Clé_couple: "ciprofloxacine_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: "potassium chlorure", Clé_couple: "ciprofloxacine_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_ciprofloxacine", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_ciprofloxacine", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_ciprofloxacine", Compatibilité: "C" },
+  { Substance_A: "ciprofloxacine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_ciprofloxacine", Compatibilité: "C" },
+  { Substance_A: "cisatracurium", Substance_B: "fentanyl", Clé_couple: "cisatracurium_fentanyl", Compatibilité: "C" },
+  { Substance_A: "cisatracurium", Substance_B: "morphine HCl", Clé_couple: "cisatracurium_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "cisatracurium", Substance_B: "sufentanil", Clé_couple: "cisatracurium_sufentanil", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: "amox/ac. Clavulanique", Clé_couple: "amox/ac. Clavulanique_clarithromycine", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: "dobutamine", Clé_couple: "clarithromycine_dobutamine", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: "gentamicine", Clé_couple: "clarithromycine_gentamicine", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: "insuline rapide", Clé_couple: "clarithromycine_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: "lidocaïne", Clé_couple: "clarithromycine_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: "métronidazole", Clé_couple: "clarithromycine_métronidazole", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: "potassium chlorure", Clé_couple: "clarithromycine_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: "vancomycine", Clé_couple: "clarithromycine_vancomycine", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_clarithromycine", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_clarithromycine", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_clarithromycine", Compatibilité: "C" },
+  { Substance_A: "clarithromycine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_clarithromycine", Compatibilité: "C" },
+  { Substance_A: "clonazepam", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_clonazepam", Compatibilité: "C" },
+  { Substance_A: "clonazepam", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_clonazepam", Compatibilité: "C" },
+  { Substance_A: "clonazepam", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_clonazepam", Compatibilité: "C" },
+  { Substance_A: "clonidine", Substance_B: "héparine", Clé_couple: "clonidine_héparine", Compatibilité: "C" },
+  { Substance_A: "clonidine", Substance_B: "ketamine", Clé_couple: "clonidine_ketamine", Compatibilité: "C" },
+  { Substance_A: "clonidine", Substance_B: "midazolam", Clé_couple: "clonidine_midazolam", Compatibilité: "C" },
+  { Substance_A: "clonidine", Substance_B: "morphine HCl", Clé_couple: "clonidine_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "clonidine", Substance_B: "nicardipine", Clé_couple: "clonidine_nicardipine", Compatibilité: "C" },
+  { Substance_A: "clonidine", Substance_B: "sufentanil", Clé_couple: "clonidine_sufentanil", Compatibilité: "C" },
+  { Substance_A: "clonidine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_clonidine", Compatibilité: "C" },
+  { Substance_A: "dexmedetomidine", Substance_B: "fentanyl", Clé_couple: "dexmedetomidine_fentanyl", Compatibilité: "C" },
+  { Substance_A: "dexmedetomidine", Substance_B: "ketamine", Clé_couple: "dexmedetomidine_ketamine", Compatibilité: "C" },
+  { Substance_A: "dexmedetomidine", Substance_B: "midazolam", Clé_couple: "dexmedetomidine_midazolam", Compatibilité: "C" },
+  { Substance_A: "dexmedetomidine", Substance_B: "morphine HCl", Clé_couple: "dexmedetomidine_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "dexmedetomidine", Substance_B: "noradrénaline", Clé_couple: "dexmedetomidine_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "dexmedetomidine", Substance_B: "propofol", Clé_couple: "dexmedetomidine_propofol", Compatibilité: "C" },
+  { Substance_A: "dexmedetomidine", Substance_B: "sufentanil", Clé_couple: "dexmedetomidine_sufentanil", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "adrénaline ", Clé_couple: "adrénaline _dlitiazem", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "dobutamine", Clé_couple: "dlitiazem_dobutamine", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "erythromycine", Clé_couple: "dlitiazem_erythromycine", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "esmolol", Clé_couple: "dlitiazem_esmolol", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "fentanyl", Clé_couple: "dlitiazem_fentanyl", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "fluconazole", Clé_couple: "dlitiazem_fluconazole", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "gentamicine", Clé_couple: "dlitiazem_gentamicine", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "imipenem/cilastatine", Clé_couple: "dlitiazem_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "labetalol", Clé_couple: "dlitiazem_labetalol", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "lidocaïne", Clé_couple: "dlitiazem_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "métronidazole", Clé_couple: "dlitiazem_métronidazole", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "midazolam", Clé_couple: "dlitiazem_midazolam", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "milrinone", Clé_couple: "dlitiazem_milrinone", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "morphine HCl", Clé_couple: "dlitiazem_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "nicardipine", Clé_couple: "dlitiazem_nicardipine", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "nitroglycérine", Clé_couple: "dlitiazem_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "noradrénaline", Clé_couple: "dlitiazem_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "potassium chlorure", Clé_couple: "dlitiazem_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "potassium phosphate", Clé_couple: "dlitiazem_potassium phosphate", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "triméthoprime/sulfaméthoxazole", Clé_couple: "dlitiazem_triméthoprime/sulfaméthoxazole", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "vancomycine", Clé_couple: "dlitiazem_vancomycine", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: "vasopressine", Clé_couple: "dlitiazem_vasopressine", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_dlitiazem", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_dlitiazem", Compatibilité: "C" },
+  { Substance_A: "dlitiazem", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_dlitiazem", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "adrénaline ", Clé_couple: "adrénaline _dobutamine", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "erythromycine", Clé_couple: "dobutamine_erythromycine", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "esmolol", Clé_couple: "dobutamine_esmolol", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "fentanyl", Clé_couple: "dobutamine_fentanyl", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "fluconazole", Clé_couple: "dobutamine_fluconazole", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "gentamicine", Clé_couple: "dobutamine_gentamicine", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "insuline rapide", Clé_couple: "dobutamine_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "labetalol", Clé_couple: "dobutamine_labetalol", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "lidocaïne", Clé_couple: "dobutamine_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "magnesium sulfate", Clé_couple: "dobutamine_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "meropenem", Clé_couple: "dobutamine_meropenem", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "metoprolol", Clé_couple: "dobutamine_metoprolol", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "midazolam", Clé_couple: "dobutamine_midazolam", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "milrinone", Clé_couple: "dobutamine_milrinone", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "morphine HCl", Clé_couple: "dobutamine_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "naloxone", Clé_couple: "dobutamine_naloxone", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "nicardipine", Clé_couple: "dobutamine_nicardipine", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "nitroglycérine", Clé_couple: "dobutamine_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "noradrénaline", Clé_couple: "dobutamine_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "ondansetron", Clé_couple: "dobutamine_ondansetron", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "potassium chlorure", Clé_couple: "dobutamine_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "propofol", Clé_couple: "dobutamine_propofol", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "sufentanil", Clé_couple: "dobutamine_sufentanil", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "vancomycine", Clé_couple: "dobutamine_vancomycine", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: "vasopressine", Clé_couple: "dobutamine_vasopressine", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_dobutamine", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_dobutamine", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_dobutamine", Compatibilité: "C" },
+  { Substance_A: "dobutamine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_dobutamine", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "adrénaline ", Clé_couple: "adrénaline _erythromycine", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "esmolol", Clé_couple: "erythromycine_esmolol", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "fentanyl", Clé_couple: "erythromycine_fentanyl", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "imipenem/cilastatine", Clé_couple: "erythromycine_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "insuline rapide", Clé_couple: "erythromycine_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "labetalol", Clé_couple: "erythromycine_labetalol", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "magnesium sulfate", Clé_couple: "erythromycine_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "métronidazole", Clé_couple: "erythromycine_métronidazole", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "midazolam", Clé_couple: "erythromycine_midazolam", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "morphine HCl", Clé_couple: "erythromycine_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "naloxone", Clé_couple: "erythromycine_naloxone", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "nitroglycérine", Clé_couple: "erythromycine_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "noradrénaline", Clé_couple: "erythromycine_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "ondansetron", Clé_couple: "erythromycine_ondansetron", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "sodium bicarbonate", Clé_couple: "erythromycine_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "sufentanil", Clé_couple: "erythromycine_sufentanil", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "vancomycine", Clé_couple: "erythromycine_vancomycine", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: "vasopressine", Clé_couple: "erythromycine_vasopressine", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_erythromycine", Compatibilité: "C" },
+  { Substance_A: "erythromycine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_erythromycine", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "adrénaline ", Clé_couple: "adrénaline _esmolol", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "fentanyl", Clé_couple: "esmolol_fentanyl", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "fluconazole", Clé_couple: "esmolol_fluconazole", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "gentamicine", Clé_couple: "esmolol_gentamicine", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "héparine", Clé_couple: "esmolol_héparine", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "imipenem/cilastatine", Clé_couple: "esmolol_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "insuline rapide", Clé_couple: "esmolol_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "labetalol", Clé_couple: "esmolol_labetalol", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "lidocaïne", Clé_couple: "esmolol_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "magnesium sulfate", Clé_couple: "esmolol_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "metoprolol", Clé_couple: "esmolol_metoprolol", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "métronidazole", Clé_couple: "esmolol_métronidazole", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "midazolam", Clé_couple: "esmolol_midazolam", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "morphine HCl", Clé_couple: "esmolol_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "naloxone", Clé_couple: "esmolol_naloxone", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "nitroglycérine", Clé_couple: "esmolol_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "noradrénaline", Clé_couple: "esmolol_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "ondansetron", Clé_couple: "esmolol_ondansetron", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "potassium chlorure", Clé_couple: "esmolol_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "potassium phosphate", Clé_couple: "esmolol_potassium phosphate", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "propofol", Clé_couple: "esmolol_propofol", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "sodium bicarbonate", Clé_couple: "esmolol_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "sufentanil", Clé_couple: "esmolol_sufentanil", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "triméthoprime/sulfaméthoxazole", Clé_couple: "esmolol_triméthoprime/sulfaméthoxazole", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "vancomycine", Clé_couple: "esmolol_vancomycine", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: "vasopressine", Clé_couple: "esmolol_vasopressine", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_esmolol", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_esmolol", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_esmolol", Compatibilité: "C" },
+  { Substance_A: "esmolol", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_esmolol", Compatibilité: "C" },
+  { Substance_A: "esomeprazole", Substance_B: "furosémide", Clé_couple: "esomeprazole_furosémide", Compatibilité: "C" },
+  { Substance_A: "esomeprazole", Substance_B: "héparine", Clé_couple: "esomeprazole_héparine", Compatibilité: "C" },
+  { Substance_A: "esomeprazole", Substance_B: "insuline rapide", Clé_couple: "esomeprazole_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "esomeprazole", Substance_B: "octréotide", Clé_couple: "esomeprazole_octréotide", Compatibilité: "C" },
+  { Substance_A: "esomeprazole", Substance_B: "potassium chlorure", Clé_couple: "esomeprazole_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "adrénaline ", Clé_couple: "adrénaline _fentanyl", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "fluconazole", Clé_couple: "fentanyl_fluconazole", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "furosémide", Clé_couple: "fentanyl_furosémide", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "gentamicine", Clé_couple: "fentanyl_gentamicine", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "héparine", Clé_couple: "fentanyl_héparine", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "imipenem/cilastatine", Clé_couple: "fentanyl_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "insuline rapide", Clé_couple: "fentanyl_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "ketamine", Clé_couple: "fentanyl_ketamine", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "labetalol", Clé_couple: "fentanyl_labetalol", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "lidocaïne", Clé_couple: "fentanyl_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "magnesium sulfate", Clé_couple: "fentanyl_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "metoprolol", Clé_couple: "fentanyl_metoprolol", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "métronidazole", Clé_couple: "fentanyl_métronidazole", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "midazolam", Clé_couple: "fentanyl_midazolam", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "milrinone", Clé_couple: "fentanyl_milrinone", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "morphine HCl", Clé_couple: "fentanyl_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "naloxone", Clé_couple: "fentanyl_naloxone", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "nicardipine", Clé_couple: "fentanyl_nicardipine", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "nitroglycérine", Clé_couple: "fentanyl_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "noradrénaline", Clé_couple: "fentanyl_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "ondansetron", Clé_couple: "fentanyl_ondansetron", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "potassium chlorure", Clé_couple: "fentanyl_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "potassium phosphate", Clé_couple: "fentanyl_potassium phosphate", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "propofol", Clé_couple: "fentanyl_propofol", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "rocuronium", Clé_couple: "fentanyl_rocuronium", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "sodium bicarbonate", Clé_couple: "fentanyl_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "sufentanil", Clé_couple: "fentanyl_sufentanil", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "vancomycine", Clé_couple: "fentanyl_vancomycine", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: "vasopressine", Clé_couple: "fentanyl_vasopressine", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_fentanyl", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_fentanyl", Compatibilité: "C" },
+  { Substance_A: "fentanyl", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_fentanyl", Compatibilité: "C" },
+  { Substance_A: "flucloxacilline", Substance_B: "métronidazole", Clé_couple: "flucloxacilline_métronidazole", Compatibilité: "C" },
+  { Substance_A: "flucloxacilline", Substance_B: "potassium chlorure", Clé_couple: "flucloxacilline_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "flucloxacilline", Substance_B: "sodium bicarbonate", Clé_couple: "flucloxacilline_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "flucloxacilline", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_flucloxacilline", Compatibilité: "C" },
+  { Substance_A: "flucloxacilline", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_flucloxacilline", Compatibilité: "C" },
+  { Substance_A: "flucloxacilline", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_flucloxacilline", Compatibilité: "C" },
+  { Substance_A: "flucloxacilline", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_flucloxacilline", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "adrénaline ", Clé_couple: "adrénaline _fluconazole", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "gentamicine", Clé_couple: "fluconazole_gentamicine", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "héparine", Clé_couple: "fluconazole_héparine", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "insuline rapide", Clé_couple: "fluconazole_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "labetalol", Clé_couple: "fluconazole_labetalol", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "lidocaïne", Clé_couple: "fluconazole_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "magnesium sulfate", Clé_couple: "fluconazole_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "meropenem", Clé_couple: "fluconazole_meropenem", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "metoprolol", Clé_couple: "fluconazole_metoprolol", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "métronidazole", Clé_couple: "fluconazole_métronidazole", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "midazolam", Clé_couple: "fluconazole_midazolam", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "morphine HCl", Clé_couple: "fluconazole_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "naloxone", Clé_couple: "fluconazole_naloxone", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "nitroglycérine", Clé_couple: "fluconazole_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "noradrénaline", Clé_couple: "fluconazole_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "ondansetron", Clé_couple: "fluconazole_ondansetron", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "pipéracilline/tazobactam", Clé_couple: "fluconazole_pipéracilline/tazobactam", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "potassium chlorure", Clé_couple: "fluconazole_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "propofol", Clé_couple: "fluconazole_propofol", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "sodium bicarbonate", Clé_couple: "fluconazole_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "sufentanil", Clé_couple: "fluconazole_sufentanil", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "vancomycine", Clé_couple: "fluconazole_vancomycine", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: "vasopressine", Clé_couple: "fluconazole_vasopressine", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_fluconazole", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_fluconazole", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_fluconazole", Compatibilité: "C" },
+  { Substance_A: "fluconazole", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_fluconazole", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "héparine", Clé_couple: "furosémide_héparine", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "imipenem/cilastatine", Clé_couple: "furosémide_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "insuline rapide", Clé_couple: "furosémide_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "lidocaïne", Clé_couple: "furosémide_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "meropenem", Clé_couple: "furosémide_meropenem", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "metoprolol", Clé_couple: "furosémide_metoprolol", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "métronidazole", Clé_couple: "furosémide_métronidazole", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "nitroglycérine", Clé_couple: "furosémide_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "potassium chlorure", Clé_couple: "furosémide_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "propofol", Clé_couple: "furosémide_propofol", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "sodium bicarbonate", Clé_couple: "furosémide_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "sufentanil", Clé_couple: "furosémide_sufentanil", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: "vasopressine", Clé_couple: "furosémide_vasopressine", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_furosémide", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_furosémide", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_furosémide", Compatibilité: "C" },
+  { Substance_A: "furosémide", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_furosémide", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "adrénaline ", Clé_couple: "adrénaline _gentamicine", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "insuline rapide", Clé_couple: "gentamicine_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "labetalol", Clé_couple: "gentamicine_labetalol", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "lidocaïne", Clé_couple: "gentamicine_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "magnesium sulfate", Clé_couple: "gentamicine_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "meropenem", Clé_couple: "gentamicine_meropenem", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "metoprolol", Clé_couple: "gentamicine_metoprolol", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "métronidazole", Clé_couple: "gentamicine_métronidazole", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "midazolam", Clé_couple: "gentamicine_midazolam", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "milrinone", Clé_couple: "gentamicine_milrinone", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "morphine HCl", Clé_couple: "gentamicine_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "naloxone", Clé_couple: "gentamicine_naloxone", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "nitroglycérine", Clé_couple: "gentamicine_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "noradrénaline", Clé_couple: "gentamicine_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "ondansetron", Clé_couple: "gentamicine_ondansetron", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "potassium chlorure", Clé_couple: "gentamicine_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "sodium bicarbonate", Clé_couple: "gentamicine_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "sufentanil", Clé_couple: "gentamicine_sufentanil", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "vancomycine", Clé_couple: "gentamicine_vancomycine", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: "vasopressine", Clé_couple: "gentamicine_vasopressine", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_gentamicine", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_gentamicine", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_gentamicine", Compatibilité: "C" },
+  { Substance_A: "gentamicine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_gentamicine", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "adrénaline ", Clé_couple: "adrénaline _héparine", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "imipenem/cilastatine", Clé_couple: "héparine_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "insuline rapide", Clé_couple: "héparine_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "lidocaïne", Clé_couple: "héparine_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "magnesium sulfate", Clé_couple: "héparine_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "meropenem", Clé_couple: "héparine_meropenem", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "metoprolol", Clé_couple: "héparine_metoprolol", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "métronidazole", Clé_couple: "héparine_métronidazole", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "midazolam", Clé_couple: "héparine_midazolam", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "milrinone", Clé_couple: "héparine_milrinone", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "morphine HCl", Clé_couple: "héparine_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "naloxone", Clé_couple: "héparine_naloxone", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "nitroglycérine", Clé_couple: "héparine_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "noradrénaline", Clé_couple: "héparine_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "octréotide", Clé_couple: "héparine_octréotide", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "potassium chlorure", Clé_couple: "héparine_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "propofol", Clé_couple: "héparine_propofol", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "rocuronium", Clé_couple: "héparine_rocuronium", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "sodium bicarbonate", Clé_couple: "héparine_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "sufentanil", Clé_couple: "héparine_sufentanil", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: "vasopressine", Clé_couple: "héparine_vasopressine", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_héparine", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_héparine", Compatibilité: "C" },
+  { Substance_A: "héparine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_héparine", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "adrénaline ", Clé_couple: "adrénaline _imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "insuline rapide", Clé_couple: "imipenem/cilastatine_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "labetalol", Clé_couple: "imipenem/cilastatine_labetalol", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "lidocaïne", Clé_couple: "imipenem/cilastatine_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "magnesium sulfate", Clé_couple: "imipenem/cilastatine_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "metoprolol", Clé_couple: "imipenem/cilastatine_metoprolol", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "métronidazole", Clé_couple: "imipenem/cilastatine_métronidazole", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "morphine HCl", Clé_couple: "imipenem/cilastatine_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "naloxone", Clé_couple: "imipenem/cilastatine_naloxone", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "nitroglycérine", Clé_couple: "imipenem/cilastatine_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "noradrénaline", Clé_couple: "imipenem/cilastatine_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "ondansetron", Clé_couple: "imipenem/cilastatine_ondansetron", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "potassium chlorure", Clé_couple: "imipenem/cilastatine_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "propofol", Clé_couple: "imipenem/cilastatine_propofol", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "sufentanil", Clé_couple: "imipenem/cilastatine_sufentanil", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "vancomycine", Clé_couple: "imipenem/cilastatine_vancomycine", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "vasopressine", Clé_couple: "imipenem/cilastatine_vasopressine", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_imipenem/cilastatine", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "lidocaïne", Clé_couple: "insuline rapide_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "magnesium sulfate", Clé_couple: "insuline rapide_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "meropenem", Clé_couple: "insuline rapide_meropenem", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "metoprolol", Clé_couple: "insuline rapide_metoprolol", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "métronidazole", Clé_couple: "insuline rapide_métronidazole", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "midazolam", Clé_couple: "insuline rapide_midazolam", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "milrinone", Clé_couple: "insuline rapide_milrinone", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "morphine HCl", Clé_couple: "insuline rapide_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "naloxone", Clé_couple: "insuline rapide_naloxone", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "nitroglycérine", Clé_couple: "insuline rapide_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "potassium chlorure", Clé_couple: "insuline rapide_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "propofol", Clé_couple: "insuline rapide_propofol", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "sodium bicarbonate", Clé_couple: "insuline rapide_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "sufentanil", Clé_couple: "insuline rapide_sufentanil", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: "vancomycine", Clé_couple: "insuline rapide_vancomycine", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "insuline rapide", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_insuline rapide", Compatibilité: "C" },
+  { Substance_A: "isoprénaline", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_isoprénaline", Compatibilité: "C" },
+  { Substance_A: "isoprénaline", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_isoprénaline", Compatibilité: "C" },
+  { Substance_A: "isoprénaline", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_isoprénaline", Compatibilité: "C" },
+  { Substance_A: "isoprénaline", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_isoprénaline", Compatibilité: "C" },
+  { Substance_A: "ketamine", Substance_B: "midazolam", Clé_couple: "ketamine_midazolam", Compatibilité: "C" },
+  { Substance_A: "ketamine", Substance_B: "morphine HCl", Clé_couple: "ketamine_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "ketamine", Substance_B: "propofol", Clé_couple: "ketamine_propofol", Compatibilité: "C" },
+  { Substance_A: "ketamine", Substance_B: "sufentanil", Clé_couple: "ketamine_sufentanil", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "adrénaline ", Clé_couple: "adrénaline _labetalol", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "lidocaïne", Clé_couple: "labetalol_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "magnesium sulfate", Clé_couple: "labetalol_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "metoprolol", Clé_couple: "labetalol_metoprolol", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "métronidazole", Clé_couple: "labetalol_métronidazole", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "midazolam", Clé_couple: "labetalol_midazolam", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "milrinone", Clé_couple: "labetalol_milrinone", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "morphine HCl", Clé_couple: "labetalol_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "nitroglycérine", Clé_couple: "labetalol_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "noradrénaline", Clé_couple: "labetalol_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "ondansetron", Clé_couple: "labetalol_ondansetron", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "potassium chlorure", Clé_couple: "labetalol_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "potassium phosphate", Clé_couple: "labetalol_potassium phosphate", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "propofol", Clé_couple: "labetalol_propofol", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "triméthoprime/sulfaméthoxazole", Clé_couple: "labetalol_triméthoprime/sulfaméthoxazole", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "vancomycine", Clé_couple: "labetalol_vancomycine", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: "vasopressine", Clé_couple: "labetalol_vasopressine", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_labetalol", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_labetalol", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_labetalol", Compatibilité: "C" },
+  { Substance_A: "labetalol", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_labetalol", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "adrénaline ", Clé_couple: "adrénaline _lidocaïne", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "magnesium sulfate", Clé_couple: "lidocaïne_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "metoprolol", Clé_couple: "lidocaïne_metoprolol", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "métronidazole", Clé_couple: "lidocaïne_métronidazole", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "midazolam", Clé_couple: "lidocaïne_midazolam", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "milrinone", Clé_couple: "lidocaïne_milrinone", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "morphine HCl", Clé_couple: "lidocaïne_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "naloxone", Clé_couple: "lidocaïne_naloxone", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "nitroglycérine", Clé_couple: "lidocaïne_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "noradrénaline", Clé_couple: "lidocaïne_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "ondansetron", Clé_couple: "lidocaïne_ondansetron", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "potassium chlorure", Clé_couple: "lidocaïne_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "propofol", Clé_couple: "lidocaïne_propofol", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "sufentanil", Clé_couple: "lidocaïne_sufentanil", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "vancomycine", Clé_couple: "lidocaïne_vancomycine", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: "vasopressine", Clé_couple: "lidocaïne_vasopressine", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "lidocaïne", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_lidocaïne", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "adrénaline ", Clé_couple: "adrénaline _magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "meropenem", Clé_couple: "magnesium sulfate_meropenem", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "metoprolol", Clé_couple: "magnesium sulfate_metoprolol", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "métronidazole", Clé_couple: "magnesium sulfate_métronidazole", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "midazolam", Clé_couple: "magnesium sulfate_midazolam", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "milrinone", Clé_couple: "magnesium sulfate_milrinone", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "morphine HCl", Clé_couple: "magnesium sulfate_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "nitroglycérine", Clé_couple: "magnesium sulfate_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "noradrénaline", Clé_couple: "magnesium sulfate_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "ondansetron", Clé_couple: "magnesium sulfate_ondansetron", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "potassium chlorure", Clé_couple: "magnesium sulfate_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "propofol", Clé_couple: "magnesium sulfate_propofol", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "sufentanil", Clé_couple: "magnesium sulfate_sufentanil", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "triméthoprime/sulfaméthoxazole", Clé_couple: "magnesium sulfate_triméthoprime/sulfaméthoxazole", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "vancomycine", Clé_couple: "magnesium sulfate_vancomycine", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: "vasopressine", Clé_couple: "magnesium sulfate_vasopressine", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "magnesium sulfate", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_magnesium sulfate", Compatibilité: "C" },
+  { Substance_A: "meropenem", Substance_B: "milrinone", Clé_couple: "meropenem_milrinone", Compatibilité: "C" },
+  { Substance_A: "meropenem", Substance_B: "morphine HCl", Clé_couple: "meropenem_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "meropenem", Substance_B: "noradrénaline", Clé_couple: "meropenem_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "meropenem", Substance_B: "vancomycine", Clé_couple: "meropenem_vancomycine", Compatibilité: "C" },
+  { Substance_A: "meropenem", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_meropenem", Compatibilité: "C" },
+  { Substance_A: "meropenem", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_meropenem", Compatibilité: "C" },
+  { Substance_A: "meropenem", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_meropenem", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "adrénaline ", Clé_couple: "adrénaline _metoprolol", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "métronidazole", Clé_couple: "metoprolol_métronidazole", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "midazolam", Clé_couple: "metoprolol_midazolam", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "morphine HCl", Clé_couple: "metoprolol_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "naloxone", Clé_couple: "metoprolol_naloxone", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "nitroglycérine", Clé_couple: "metoprolol_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "noradrénaline", Clé_couple: "metoprolol_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "ondansetron", Clé_couple: "metoprolol_ondansetron", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "potassium chlorure", Clé_couple: "metoprolol_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "sodium bicarbonate", Clé_couple: "metoprolol_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "sufentanil", Clé_couple: "metoprolol_sufentanil", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "vancomycine", Clé_couple: "metoprolol_vancomycine", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: "vasopressine", Clé_couple: "metoprolol_vasopressine", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_metoprolol", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_metoprolol", Compatibilité: "C" },
+  { Substance_A: "metoprolol", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_metoprolol", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "adrénaline ", Clé_couple: "adrénaline _métronidazole", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "midazolam", Clé_couple: "métronidazole_midazolam", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "milrinone", Clé_couple: "métronidazole_milrinone", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "morphine HCl", Clé_couple: "métronidazole_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "naloxone", Clé_couple: "métronidazole_naloxone", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "nitroglycérine", Clé_couple: "métronidazole_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "noradrénaline", Clé_couple: "métronidazole_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "pipéracilline/tazobactam", Clé_couple: "métronidazole_pipéracilline/tazobactam", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "potassium chlorure", Clé_couple: "métronidazole_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "sodium bicarbonate", Clé_couple: "métronidazole_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "sufentanil", Clé_couple: "métronidazole_sufentanil", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "vancomycine", Clé_couple: "métronidazole_vancomycine", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: "vasopressine", Clé_couple: "métronidazole_vasopressine", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_métronidazole", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_métronidazole", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_métronidazole", Compatibilité: "C" },
+  { Substance_A: "métronidazole", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_métronidazole", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "adrénaline ", Clé_couple: "adrénaline _midazolam", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "milrinone", Clé_couple: "midazolam_milrinone", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "morphine HCl", Clé_couple: "midazolam_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "naloxone", Clé_couple: "midazolam_naloxone", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "nitroglycérine", Clé_couple: "midazolam_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "noradrénaline", Clé_couple: "midazolam_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "ondansetron", Clé_couple: "midazolam_ondansetron", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "potassium chlorure", Clé_couple: "midazolam_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "propofol", Clé_couple: "midazolam_propofol", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "sufentanil", Clé_couple: "midazolam_sufentanil", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "vancomycine", Clé_couple: "midazolam_vancomycine", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: "vasopressine", Clé_couple: "midazolam_vasopressine", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_midazolam", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_midazolam", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_midazolam", Compatibilité: "C" },
+  { Substance_A: "midazolam", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_midazolam", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: "adrénaline ", Clé_couple: "adrénaline _milrinone", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: "morphine HCl", Clé_couple: "milrinone_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: "nitroglycérine", Clé_couple: "milrinone_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: "noradrénaline", Clé_couple: "milrinone_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: "pipéracilline/tazobactam", Clé_couple: "milrinone_pipéracilline/tazobactam", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: "potassium chlorure", Clé_couple: "milrinone_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: "propofol", Clé_couple: "milrinone_propofol", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: "sodium bicarbonate", Clé_couple: "milrinone_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: "vancomycine", Clé_couple: "milrinone_vancomycine", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: "vasopressine", Clé_couple: "milrinone_vasopressine", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_milrinone", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_milrinone", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_milrinone", Compatibilité: "C" },
+  { Substance_A: "milrinone", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_milrinone", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "adrénaline ", Clé_couple: "adrénaline _morphine HCl", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "naloxone", Clé_couple: "morphine HCl_naloxone", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "nitroglycérine", Clé_couple: "morphine HCl_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "noradrénaline", Clé_couple: "morphine HCl_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "ondansetron", Clé_couple: "morphine HCl_ondansetron", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "pipéracilline/tazobactam", Clé_couple: "morphine HCl_pipéracilline/tazobactam", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "potassium chlorure", Clé_couple: "morphine HCl_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "propofol", Clé_couple: "morphine HCl_propofol", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "rocuronium", Clé_couple: "morphine HCl_rocuronium", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "salbutamol", Clé_couple: "morphine HCl_salbutamol", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "sufentanil", Clé_couple: "morphine HCl_sufentanil", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "triméthoprime/sulfaméthoxazole", Clé_couple: "morphine HCl_triméthoprime/sulfaméthoxazole", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "vancomycine", Clé_couple: "morphine HCl_vancomycine", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: "vasopressine", Clé_couple: "morphine HCl_vasopressine", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "morphine HCl", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_morphine HCl", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: "adrénaline ", Clé_couple: "adrénaline _naloxone", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: "nitroglycérine", Clé_couple: "naloxone_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: "noradrénaline", Clé_couple: "naloxone_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: "ondansetron", Clé_couple: "naloxone_ondansetron", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: "potassium chlorure", Clé_couple: "naloxone_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: "propofol", Clé_couple: "naloxone_propofol", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: "sodium bicarbonate", Clé_couple: "naloxone_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: "sufentanil", Clé_couple: "naloxone_sufentanil", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: "vancomycine", Clé_couple: "naloxone_vancomycine", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: "vasopressine", Clé_couple: "naloxone_vasopressine", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_naloxone", Compatibilité: "C" },
+  { Substance_A: "naloxone", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_naloxone", Compatibilité: "C" },
+  { Substance_A: "nicardipine", Substance_B: "adrénaline ", Clé_couple: "adrénaline _nicardipine", Compatibilité: "C" },
+  { Substance_A: "nimodipine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_nimodipine", Compatibilité: "C" },
+  { Substance_A: "nimodipine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_nimodipine", Compatibilité: "C" },
+  { Substance_A: "nimodipine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_nimodipine", Compatibilité: "C" },
+  { Substance_A: "nimodipine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_nimodipine", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: "adrénaline ", Clé_couple: "adrénaline _nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: "noradrénaline", Clé_couple: "nitroglycérine_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: "ondansetron", Clé_couple: "nitroglycérine_ondansetron", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: "potassium chlorure", Clé_couple: "nitroglycérine_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: "propofol", Clé_couple: "nitroglycérine_propofol", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: "sodium bicarbonate", Clé_couple: "nitroglycérine_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: "sufentanil", Clé_couple: "nitroglycérine_sufentanil", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: "urapidil", Clé_couple: "nitroglycérine_urapidil", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: "vancomycine", Clé_couple: "nitroglycérine_vancomycine", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: "vasopressine", Clé_couple: "nitroglycérine_vasopressine", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "nitroglycérine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_nitroglycérine", Compatibilité: "C" },
+  { Substance_A: "noradrénaline", Substance_B: "adrénaline ", Clé_couple: "adrénaline _noradrénaline", Compatibilité: "C" },
+  { Substance_A: "noradrénaline", Substance_B: "ondansetron", Clé_couple: "noradrénaline_ondansetron", Compatibilité: "C" },
+  { Substance_A: "noradrénaline", Substance_B: "potassium chlorure", Clé_couple: "noradrénaline_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "noradrénaline", Substance_B: "propofol", Clé_couple: "noradrénaline_propofol", Compatibilité: "C" },
+  { Substance_A: "noradrénaline", Substance_B: "sufentanil", Clé_couple: "noradrénaline_sufentanil", Compatibilité: "C" },
+  { Substance_A: "noradrénaline", Substance_B: "vancomycine", Clé_couple: "noradrénaline_vancomycine", Compatibilité: "C" },
+  { Substance_A: "noradrénaline", Substance_B: "vasopressine", Clé_couple: "noradrénaline_vasopressine", Compatibilité: "C" },
+  { Substance_A: "noradrénaline", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "noradrénaline", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "noradrénaline", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "noradrénaline", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_noradrénaline", Compatibilité: "C" },
+  { Substance_A: "octréotide", Substance_B: "pantoprazole", Clé_couple: "octréotide_pantoprazole", Compatibilité: "C" },
+  { Substance_A: "octréotide", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_octréotide", Compatibilité: "C" },
+  { Substance_A: "ondansetron", Substance_B: "adrénaline ", Clé_couple: "adrénaline _ondansetron", Compatibilité: "C" },
+  { Substance_A: "ondansetron", Substance_B: "pipéracilline/tazobactam", Clé_couple: "ondansetron_pipéracilline/tazobactam", Compatibilité: "C" },
+  { Substance_A: "ondansetron", Substance_B: "potassium chlorure", Clé_couple: "ondansetron_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "ondansetron", Substance_B: "propofol", Clé_couple: "ondansetron_propofol", Compatibilité: "C" },
+  { Substance_A: "ondansetron", Substance_B: "sufentanil", Clé_couple: "ondansetron_sufentanil", Compatibilité: "C" },
+  { Substance_A: "ondansetron", Substance_B: "vancomycine", Clé_couple: "ondansetron_vancomycine", Compatibilité: "C" },
+  { Substance_A: "ondansetron", Substance_B: "vasopressine", Clé_couple: "ondansetron_vasopressine", Compatibilité: "C" },
+  { Substance_A: "ondansetron", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_ondansetron", Compatibilité: "C" },
+  { Substance_A: "ondansetron", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_ondansetron", Compatibilité: "C" },
+  { Substance_A: "ondansetron", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_ondansetron", Compatibilité: "C" },
+  { Substance_A: "ondansetron", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_ondansetron", Compatibilité: "C" },
+  { Substance_A: "pantoprazole", Substance_B: "potassium chlorure", Clé_couple: "pantoprazole_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "pipéracilline/tazobactam", Substance_B: "sodium bicarbonate", Clé_couple: "pipéracilline/tazobactam_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "pipéracilline/tazobactam", Substance_B: "triméthoprime/sulfaméthoxazole", Clé_couple: "pipéracilline/tazobactam_triméthoprime/sulfaméthoxazole", Compatibilité: "C" },
+  { Substance_A: "pipéracilline/tazobactam", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_pipéracilline/tazobactam", Compatibilité: "C" },
+  { Substance_A: "pipéracilline/tazobactam", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_pipéracilline/tazobactam", Compatibilité: "C" },
+  { Substance_A: "pipéracilline/tazobactam", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_pipéracilline/tazobactam", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: "adrénaline ", Clé_couple: "adrénaline _potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: "amox/ac. Clavulanique", Clé_couple: "amox/ac. Clavulanique_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: "potassium phosphate", Clé_couple: "potassium chlorure_potassium phosphate", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: "propofol", Clé_couple: "potassium chlorure_propofol", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: "salbutamol", Clé_couple: "potassium chlorure_salbutamol", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: "sodium bicarbonate", Clé_couple: "potassium chlorure_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: "sufentanil", Clé_couple: "potassium chlorure_sufentanil", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: "vancomycine", Clé_couple: "potassium chlorure_vancomycine", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: "vasopressine", Clé_couple: "potassium chlorure_vasopressine", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "potassium chlorure", Substance_B: " TPN (avec lipides)", Clé_couple: " TPN (avec lipides)_potassium chlorure", Compatibilité: "C" },
+  { Substance_A: "potassium phosphate", Substance_B: "propofol", Clé_couple: "potassium phosphate_propofol", Compatibilité: "C" },
+  { Substance_A: "potassium phosphate", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_potassium phosphate", Compatibilité: "C" },
+  { Substance_A: "potassium phosphate", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_potassium phosphate", Compatibilité: "C" },
+  { Substance_A: "potassium phosphate", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_potassium phosphate", Compatibilité: "C" },
+  { Substance_A: "propofol", Substance_B: "adrénaline ", Clé_couple: "adrénaline _propofol", Compatibilité: "C" },
+  { Substance_A: "propofol", Substance_B: "sodium bicarbonate", Clé_couple: "propofol_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "propofol", Substance_B: "sufentanil", Clé_couple: "propofol_sufentanil", Compatibilité: "C" },
+  { Substance_A: "propofol", Substance_B: "vancomycine", Clé_couple: "propofol_vancomycine", Compatibilité: "C" },
+  { Substance_A: "propofol", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_propofol", Compatibilité: "C" },
+  { Substance_A: "propofol", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_propofol", Compatibilité: "C" },
+  { Substance_A: "propofol", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_propofol", Compatibilité: "C" },
+  { Substance_A: "propofol", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_propofol", Compatibilité: "C" },
+  { Substance_A: "salbutamol", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_salbutamol", Compatibilité: "C" },
+  { Substance_A: "salbutamol", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_salbutamol", Compatibilité: "C" },
+  { Substance_A: "salbutamol", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_salbutamol", Compatibilité: "C" },
+  { Substance_A: "sodium bicarbonate", Substance_B: "sufentanil", Clé_couple: "sodium bicarbonate_sufentanil", Compatibilité: "C" },
+  { Substance_A: "sodium bicarbonate", Substance_B: "vasopressine", Clé_couple: "sodium bicarbonate_vasopressine", Compatibilité: "C" },
+  { Substance_A: "sodium bicarbonate", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "sodium bicarbonate", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "sodium bicarbonate", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_sodium bicarbonate", Compatibilité: "C" },
+  { Substance_A: "sufentanil", Substance_B: "adrénaline ", Clé_couple: "adrénaline _sufentanil", Compatibilité: "C" },
+  { Substance_A: "sufentanil", Substance_B: "vancomycine", Clé_couple: "sufentanil_vancomycine", Compatibilité: "C" },
+  { Substance_A: "sufentanil", Substance_B: "vasopressine", Clé_couple: "sufentanil_vasopressine", Compatibilité: "C" },
+  { Substance_A: "sufentanil", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_sufentanil", Compatibilité: "C" },
+  { Substance_A: "sufentanil", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_sufentanil", Compatibilité: "C" },
+  { Substance_A: "sufentanil", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_sufentanil", Compatibilité: "C" },
+  { Substance_A: "triméthoprime/sulfaméthoxazole", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_triméthoprime/sulfaméthoxazole", Compatibilité: "C" },
+  { Substance_A: "triméthoprime/sulfaméthoxazole", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_triméthoprime/sulfaméthoxazole", Compatibilité: "C" },
+  { Substance_A: "triméthoprime/sulfaméthoxazole", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_triméthoprime/sulfaméthoxazole", Compatibilité: "C" },
+  { Substance_A: "vancomycine", Substance_B: "adrénaline ", Clé_couple: "adrénaline _vancomycine", Compatibilité: "C" },
+  { Substance_A: "vancomycine", Substance_B: "vasopressine", Clé_couple: "vancomycine_vasopressine", Compatibilité: "C" },
+  { Substance_A: "vancomycine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_vancomycine", Compatibilité: "C" },
+  { Substance_A: "vancomycine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_vancomycine", Compatibilité: "C" },
+  { Substance_A: "vancomycine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_vancomycine", Compatibilité: "C" },
+  { Substance_A: "vancomycine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_vancomycine", Compatibilité: "C" },
+  { Substance_A: "vasopressine", Substance_B: "adrénaline ", Clé_couple: "adrénaline _vasopressine", Compatibilité: "C" },
+  { Substance_A: "vasopressine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_vasopressine", Compatibilité: "C" },
+  { Substance_A: "vasopressine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_vasopressine", Compatibilité: "C" },
+  { Substance_A: "vasopressine", Substance_B: " NaCl ND.9%", Clé_couple: " NaCl ND.9%_vasopressine", Compatibilité: "C" },
+  { Substance_A: "aciclovir", Substance_B: "dobutamine", Clé_couple: "aciclovir_dobutamine", Compatibilité: "I" },
+  { Substance_A: "aciclovir", Substance_B: "meropenem", Clé_couple: "aciclovir_meropenem", Compatibilité: "I" },
+  { Substance_A: "aciclovir", Substance_B: "morphine HCl", Clé_couple: "aciclovir_morphine HCl", Compatibilité: "I" },
+  { Substance_A: "aciclovir", Substance_B: "ondansetron", Clé_couple: "aciclovir_ondansetron", Compatibilité: "I" },
+  { Substance_A: "aciclovir", Substance_B: "pipéracilline/tazobactam", Clé_couple: "aciclovir_pipéracilline/tazobactam", Compatibilité: "I" },
+  { Substance_A: "adrénaline", Substance_B: "furosémide", Clé_couple: "adrénaline_furosémide", Compatibilité: "I" },
+  { Substance_A: "adrénaline", Substance_B: "insuline rapide", Clé_couple: "adrénaline_insuline rapide", Compatibilité: "I" },
+  { Substance_A: "adrénaline", Substance_B: "sodium bicarbonate", Clé_couple: "adrénaline_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "albumine", Substance_B: "midazolam", Clé_couple: "albumine_midazolam", Compatibilité: "I" },
+  { Substance_A: "albumine", Substance_B: "vancomycine", Clé_couple: "albumine_vancomycine", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: "amoxicilline", Clé_couple: "amikacine_amoxicilline", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: "amox/ac. Clavulanique", Clé_couple: "amikacine_amox/ac. Clavulanique", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: "ceftazidime", Clé_couple: "amikacine_ceftazidime", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: "ceftriaxone", Clé_couple: "amikacine_ceftriaxone", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: "flucloxacilline", Clé_couple: "amikacine_flucloxacilline", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: "héparine", Clé_couple: "amikacine_héparine", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: "imipenem/cilastatine", Clé_couple: "amikacine_imipenem/cilastatine", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: "insuline rapide", Clé_couple: "amikacine_insuline rapide", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: "pipéracilline/tazobactam", Clé_couple: "amikacine_pipéracilline/tazobactam", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: "propofol", Clé_couple: "amikacine_propofol", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: "triméthoprime/sulfaméthoxazole", Clé_couple: "amikacine_triméthoprime/sulfaméthoxazole", Compatibilité: "I" },
+  { Substance_A: "amikacine", Substance_B: " TPN (avec lipides)", Clé_couple: " TPN (avec lipides)_amikacine", Compatibilité: "I" },
+  { Substance_A: "amiodarone", Substance_B: "bivalirudine", Clé_couple: "amiodarone_bivalirudine", Compatibilité: "I" },
+  { Substance_A: "amiodarone", Substance_B: "ceftazidime", Clé_couple: "amiodarone_ceftazidime", Compatibilité: "I" },
+  { Substance_A: "amiodarone", Substance_B: "flucloxacilline", Clé_couple: "amiodarone_flucloxacilline", Compatibilité: "I" },
+  { Substance_A: "amiodarone", Substance_B: "furosémide", Clé_couple: "amiodarone_furosémide", Compatibilité: "I" },
+  { Substance_A: "amiodarone", Substance_B: "héparine", Clé_couple: "amiodarone_héparine", Compatibilité: "I" },
+  { Substance_A: "amiodarone", Substance_B: "imipenem/cilastatine", Clé_couple: "amiodarone_imipenem/cilastatine", Compatibilité: "I" },
+  { Substance_A: "amiodarone", Substance_B: "magnesium sulfate", Clé_couple: "amiodarone_magnesium sulfate", Compatibilité: "I" },
+  { Substance_A: "amiodarone", Substance_B: "pipéracilline/tazobactam", Clé_couple: "amiodarone_pipéracilline/tazobactam", Compatibilité: "I" },
+  { Substance_A: "amiodarone", Substance_B: "potassium phosphate", Clé_couple: "amiodarone_potassium phosphate", Compatibilité: "I" },
+  { Substance_A: "amiodarone", Substance_B: "sodium bicarbonate", Clé_couple: "amiodarone_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "amoxicilline", Substance_B: "ciprofloxacine", Clé_couple: "amoxicilline_ciprofloxacine", Compatibilité: "I" },
+  { Substance_A: "amoxicilline", Substance_B: "gentamicine", Clé_couple: "amoxicilline_gentamicine", Compatibilité: "I" },
+  { Substance_A: "amoxicilline", Substance_B: "midazolam", Clé_couple: "amoxicilline_midazolam", Compatibilité: "I" },
+  { Substance_A: "amoxicilline", Substance_B: "sodium bicarbonate", Clé_couple: "amoxicilline_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: "amikacine", Clé_couple: "amikacine_amoxicilline/ac. clavulanique", Compatibilité: "I" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: "ciprofloxacine", Clé_couple: "amoxicilline/ac. clavulanique_ciprofloxacine", Compatibilité: "I" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: "gentamicine", Clé_couple: "amoxicilline/ac. clavulanique_gentamicine", Compatibilité: "I" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: "métronidazole", Clé_couple: "amoxicilline/ac. clavulanique_métronidazole", Compatibilité: "I" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: "midazolam", Clé_couple: "amoxicilline/ac. clavulanique_midazolam", Compatibilité: "I" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_amoxicilline/ac. clavulanique", Compatibilité: "I" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_amoxicilline/ac. clavulanique", Compatibilité: "I" },
+  { Substance_A: "amoxicilline/ac. clavulanique", Substance_B: " TPN (avec lipides)", Clé_couple: " TPN (avec lipides)_amoxicilline/ac. clavulanique", Compatibilité: "I" },
+  { Substance_A: "ceftazidime", Substance_B: "clarithromycine", Clé_couple: "ceftazidime_clarithromycine", Compatibilité: "I" },
+  { Substance_A: "ceftazidime", Substance_B: "dobutamine", Clé_couple: "ceftazidime_dobutamine", Compatibilité: "I" },
+  { Substance_A: "ceftazidime", Substance_B: "erythromycine", Clé_couple: "ceftazidime_erythromycine", Compatibilité: "I" },
+  { Substance_A: "ceftazidime", Substance_B: "fluconazole", Clé_couple: "ceftazidime_fluconazole", Compatibilité: "I" },
+  { Substance_A: "ceftazidime", Substance_B: "gentamicine", Clé_couple: "ceftazidime_gentamicine", Compatibilité: "I" },
+  { Substance_A: "ceftazidime", Substance_B: "midazolam", Clé_couple: "ceftazidime_midazolam", Compatibilité: "I" },
+  { Substance_A: "ceftazidime", Substance_B: "sodium bicarbonate", Clé_couple: "ceftazidime_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "ceftazidime", Substance_B: "vancomycine", Clé_couple: "ceftazidime_vancomycine", Compatibilité: "I" },
+  { Substance_A: "ceftriaxone", Substance_B: "dobutamine", Clé_couple: "ceftriaxone_dobutamine", Compatibilité: "I" },
+  { Substance_A: "ceftriaxone", Substance_B: "fluconazole", Clé_couple: "ceftriaxone_fluconazole", Compatibilité: "I" },
+  { Substance_A: "ceftriaxone", Substance_B: "gentamicine", Clé_couple: "ceftriaxone_gentamicine", Compatibilité: "I" },
+  { Substance_A: "ceftriaxone", Substance_B: "imipenem/cilastatine", Clé_couple: "ceftriaxone_imipenem/cilastatine", Compatibilité: "I" },
+  { Substance_A: "ceftriaxone", Substance_B: "labetalol", Clé_couple: "ceftriaxone_labetalol", Compatibilité: "I" },
+  { Substance_A: "ceftriaxone", Substance_B: "magnesium sulfate", Clé_couple: "ceftriaxone_magnesium sulfate", Compatibilité: "I" },
+  { Substance_A: "ceftriaxone", Substance_B: "métronidazole", Clé_couple: "ceftriaxone_métronidazole", Compatibilité: "I" },
+  { Substance_A: "ceftriaxone", Substance_B: "vancomycine", Clé_couple: "ceftriaxone_vancomycine", Compatibilité: "I" },
+  { Substance_A: "ceftriaxone", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_ceftriaxone", Compatibilité: "I" },
+  { Substance_A: "ciprofloxacine", Substance_B: "amox/ac. Clavulanique", Clé_couple: "amox/ac. Clavulanique_ciprofloxacine", Compatibilité: "I" },
+  { Substance_A: "ciprofloxacine", Substance_B: "flucloxacilline", Clé_couple: "ciprofloxacine_flucloxacilline", Compatibilité: "I" },
+  { Substance_A: "ciprofloxacine", Substance_B: "furosémide", Clé_couple: "ciprofloxacine_furosémide", Compatibilité: "I" },
+  { Substance_A: "ciprofloxacine", Substance_B: "héparine", Clé_couple: "ciprofloxacine_héparine", Compatibilité: "I" },
+  { Substance_A: "ciprofloxacine", Substance_B: "magnesium sulfate", Clé_couple: "ciprofloxacine_magnesium sulfate", Compatibilité: "I" },
+  { Substance_A: "ciprofloxacine", Substance_B: "potassium phosphate", Clé_couple: "ciprofloxacine_potassium phosphate", Compatibilité: "I" },
+  { Substance_A: "ciprofloxacine", Substance_B: "propofol", Clé_couple: "ciprofloxacine_propofol", Compatibilité: "I" },
+  { Substance_A: "ciprofloxacine", Substance_B: "sodium bicarbonate", Clé_couple: "ciprofloxacine_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "cisatracurium", Substance_B: "ketamine", Clé_couple: "cisatracurium_ketamine", Compatibilité: "I" },
+  { Substance_A: "cisatracurium", Substance_B: "propofol", Clé_couple: "cisatracurium_propofol", Compatibilité: "I" },
+  { Substance_A: "cisatracurium", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_cisatracurium", Compatibilité: "I" },
+  { Substance_A: "clarithromycine", Substance_B: "flucloxacilline", Clé_couple: "clarithromycine_flucloxacilline", Compatibilité: "I" },
+  { Substance_A: "clarithromycine", Substance_B: "furosémide", Clé_couple: "clarithromycine_furosémide", Compatibilité: "I" },
+  { Substance_A: "clarithromycine", Substance_B: "héparine", Clé_couple: "clarithromycine_héparine", Compatibilité: "I" },
+  { Substance_A: "clonazepam", Substance_B: "sodium bicarbonate", Clé_couple: "clonazepam_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "dlitiazem", Substance_B: "furosémide", Clé_couple: "dlitiazem_furosémide", Compatibilité: "I" },
+  { Substance_A: "dlitiazem", Substance_B: "insuline rapide", Clé_couple: "dlitiazem_insuline rapide", Compatibilité: "I" },
+  { Substance_A: "dlitiazem", Substance_B: "sodium bicarbonate", Clé_couple: "dlitiazem_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "dobutamine", Substance_B: "flucloxacilline", Clé_couple: "dobutamine_flucloxacilline", Compatibilité: "I" },
+  { Substance_A: "dobutamine", Substance_B: "furosémide", Clé_couple: "dobutamine_furosémide", Compatibilité: "I" },
+  { Substance_A: "dobutamine", Substance_B: "héparine", Clé_couple: "dobutamine_héparine", Compatibilité: "I" },
+  { Substance_A: "dobutamine", Substance_B: "imipenem/cilastatine", Clé_couple: "dobutamine_imipenem/cilastatine", Compatibilité: "I" },
+  { Substance_A: "dobutamine", Substance_B: "métronidazole", Clé_couple: "dobutamine_métronidazole", Compatibilité: "I" },
+  { Substance_A: "dobutamine", Substance_B: "pipéracilline/tazobactam", Clé_couple: "dobutamine_pipéracilline/tazobactam", Compatibilité: "I" },
+  { Substance_A: "dobutamine", Substance_B: "potassium phosphate", Clé_couple: "dobutamine_potassium phosphate", Compatibilité: "I" },
+  { Substance_A: "dobutamine", Substance_B: "sodium bicarbonate", Clé_couple: "dobutamine_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "erythromycine", Substance_B: "flucloxacilline", Clé_couple: "erythromycine_flucloxacilline", Compatibilité: "I" },
+  { Substance_A: "erythromycine", Substance_B: "fluconazole", Clé_couple: "erythromycine_fluconazole", Compatibilité: "I" },
+  { Substance_A: "erythromycine", Substance_B: "furosémide", Clé_couple: "erythromycine_furosémide", Compatibilité: "I" },
+  { Substance_A: "erythromycine", Substance_B: "gentamicine", Clé_couple: "erythromycine_gentamicine", Compatibilité: "I" },
+  { Substance_A: "erythromycine", Substance_B: "héparine", Clé_couple: "erythromycine_héparine", Compatibilité: "I" },
+  { Substance_A: "erythromycine", Substance_B: "potassium chlorure", Clé_couple: "erythromycine_potassium chlorure", Compatibilité: "I" },
+  { Substance_A: "erythromycine", Substance_B: " GLUCO-SALIN", Clé_couple: " GLUCO-SALIN_erythromycine", Compatibilité: "I" },
+  { Substance_A: "erythromycine", Substance_B: " GLUCOSE 5% et 1ND%", Clé_couple: " GLUCOSE 5% et 1ND%_erythromycine", Compatibilité: "I" },
+  { Substance_A: "esmolol", Substance_B: "furosémide", Clé_couple: "esmolol_furosémide", Compatibilité: "I" },
+  { Substance_A: "esomeprazole", Substance_B: "vancomycine", Clé_couple: "esomeprazole_vancomycine", Compatibilité: "I" },
+  { Substance_A: "flucloxacilline", Substance_B: "gentamicine", Clé_couple: "flucloxacilline_gentamicine", Compatibilité: "I" },
+  { Substance_A: "flucloxacilline", Substance_B: "midazolam", Clé_couple: "flucloxacilline_midazolam", Compatibilité: "I" },
+  { Substance_A: "flucloxacilline", Substance_B: "morphine HCl", Clé_couple: "flucloxacilline_morphine HCl", Compatibilité: "I" },
+  { Substance_A: "fluconazole", Substance_B: "furosémide", Clé_couple: "fluconazole_furosémide", Compatibilité: "I" },
+  { Substance_A: "fluconazole", Substance_B: "imipenem/cilastatine", Clé_couple: "fluconazole_imipenem/cilastatine", Compatibilité: "I" },
+  { Substance_A: "fluconazole", Substance_B: "triméthoprime/sulfaméthoxazole", Clé_couple: "fluconazole_triméthoprime/sulfaméthoxazole", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "adrénaline ", Clé_couple: "adrénaline _furosémide", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "gentamicine", Clé_couple: "furosémide_gentamicine", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "isoprénaline", Clé_couple: "furosémide_isoprénaline", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "labetalol", Clé_couple: "furosémide_labetalol", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "midazolam", Clé_couple: "furosémide_midazolam", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "milrinone", Clé_couple: "furosémide_milrinone", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "morphine HCl", Clé_couple: "furosémide_morphine HCl", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "nicardipine", Clé_couple: "furosémide_nicardipine", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "noradrénaline", Clé_couple: "furosémide_noradrénaline", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "ondansetron", Clé_couple: "furosémide_ondansetron", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "pipéracilline/tazobactam", Clé_couple: "furosémide_pipéracilline/tazobactam", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "potassium phosphate", Clé_couple: "furosémide_potassium phosphate", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "rocuronium", Clé_couple: "furosémide_rocuronium", Compatibilité: "I" },
+  { Substance_A: "furosémide", Substance_B: "vancomycine", Clé_couple: "furosémide_vancomycine", Compatibilité: "I" },
+  { Substance_A: "gentamicine", Substance_B: "amox/ac. Clavulanique", Clé_couple: "amox/ac. Clavulanique_gentamicine", Compatibilité: "I" },
+  { Substance_A: "gentamicine", Substance_B: "héparine", Clé_couple: "gentamicine_héparine", Compatibilité: "I" },
+  { Substance_A: "gentamicine", Substance_B: "imipenem/cilastatine", Clé_couple: "gentamicine_imipenem/cilastatine", Compatibilité: "I" },
+  { Substance_A: "gentamicine", Substance_B: "pipéracilline/tazobactam", Clé_couple: "gentamicine_pipéracilline/tazobactam", Compatibilité: "I" },
+  { Substance_A: "gentamicine", Substance_B: "propofol", Clé_couple: "gentamicine_propofol", Compatibilité: "I" },
+  { Substance_A: "gentamicine", Substance_B: "triméthoprime/sulfaméthoxazole", Clé_couple: "gentamicine_triméthoprime/sulfaméthoxazole", Compatibilité: "I" },
+  { Substance_A: "héparine", Substance_B: "labetalol", Clé_couple: "héparine_labetalol", Compatibilité: "I" },
+  { Substance_A: "héparine", Substance_B: "nicardipine", Clé_couple: "héparine_nicardipine", Compatibilité: "I" },
+  { Substance_A: "héparine", Substance_B: "vancomycine", Clé_couple: "héparine_vancomycine", Compatibilité: "I" },
+  { Substance_A: "héparine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_héparine", Compatibilité: "I" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "midazolam", Clé_couple: "imipenem/cilastatine_midazolam", Compatibilité: "I" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "milrinone", Clé_couple: "imipenem/cilastatine_milrinone", Compatibilité: "I" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: "sodium bicarbonate", Clé_couple: "imipenem/cilastatine_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "imipenem/cilastatine", Substance_B: " TPN (avec lipides)", Clé_couple: " TPN (avec lipides)_imipenem/cilastatine", Compatibilité: "I" },
+  { Substance_A: "insuline rapide", Substance_B: "adrénaline ", Clé_couple: "adrénaline _insuline rapide", Compatibilité: "I" },
+  { Substance_A: "insuline rapide", Substance_B: "isoprénaline", Clé_couple: "insuline rapide_isoprénaline", Compatibilité: "I" },
+  { Substance_A: "insuline rapide", Substance_B: "labetalol", Clé_couple: "insuline rapide_labetalol", Compatibilité: "I" },
+  { Substance_A: "insuline rapide", Substance_B: "noradrénaline", Clé_couple: "insuline rapide_noradrénaline", Compatibilité: "I" },
+  { Substance_A: "insuline rapide", Substance_B: "octréotide", Clé_couple: "insuline rapide_octréotide", Compatibilité: "I" },
+  { Substance_A: "insuline rapide", Substance_B: "ondansetron", Clé_couple: "insuline rapide_ondansetron", Compatibilité: "I" },
+  { Substance_A: "insuline rapide", Substance_B: "pipéracilline/tazobactam", Clé_couple: "insuline rapide_pipéracilline/tazobactam", Compatibilité: "I" },
+  { Substance_A: "insuline rapide", Substance_B: "vasopressine", Clé_couple: "insuline rapide_vasopressine", Compatibilité: "I" },
+  { Substance_A: "isoprénaline", Substance_B: "sodium bicarbonate", Clé_couple: "isoprénaline_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "labetalol", Substance_B: "sodium bicarbonate", Clé_couple: "labetalol_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "lidocaïne", Substance_B: "sodium bicarbonate", Clé_couple: "lidocaïne_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "magnesium sulfate", Substance_B: "potassium phosphate", Clé_couple: "magnesium sulfate_potassium phosphate", Compatibilité: "I" },
+  { Substance_A: "magnesium sulfate", Substance_B: "sodium bicarbonate", Clé_couple: "magnesium sulfate_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "meropenem", Substance_B: "métronidazole", Clé_couple: "meropenem_métronidazole", Compatibilité: "I" },
+  { Substance_A: "meropenem", Substance_B: "ondansetron", Clé_couple: "meropenem_ondansetron", Compatibilité: "I" },
+  { Substance_A: "métronidazole", Substance_B: "amox/ac. Clavulanique", Clé_couple: "amox/ac. Clavulanique_métronidazole", Compatibilité: "I" },
+  { Substance_A: "métronidazole", Substance_B: "ondansetron", Clé_couple: "métronidazole_ondansetron", Compatibilité: "I" },
+  { Substance_A: "métronidazole", Substance_B: " TPN (avec lipides)", Clé_couple: " TPN (avec lipides)_métronidazole", Compatibilité: "I" },
+  { Substance_A: "midazolam", Substance_B: "amox/ac. Clavulanique", Clé_couple: "amox/ac. Clavulanique_midazolam", Compatibilité: "I" },
+  { Substance_A: "midazolam", Substance_B: "sodium bicarbonate", Clé_couple: "midazolam_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "midazolam", Substance_B: "triméthoprime/sulfaméthoxazole", Clé_couple: "midazolam_triméthoprime/sulfaméthoxazole", Compatibilité: "I" },
+  { Substance_A: "morphine HCl", Substance_B: "sodium bicarbonate", Clé_couple: "morphine HCl_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "nicardipine", Substance_B: "pantoprazole", Clé_couple: "nicardipine_pantoprazole", Compatibilité: "I" },
+  { Substance_A: "nicardipine", Substance_B: "potassium phosphate", Clé_couple: "nicardipine_potassium phosphate", Compatibilité: "I" },
+  { Substance_A: "nicardipine", Substance_B: "sodium bicarbonate", Clé_couple: "nicardipine_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "nicardipine", Substance_B: "thiopenthal", Clé_couple: "nicardipine_thiopenthal", Compatibilité: "I" },
+  { Substance_A: "nicardipine", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_nicardipine", Compatibilité: "I" },
+  { Substance_A: "noradrénaline", Substance_B: "sodium bicarbonate", Clé_couple: "noradrénaline_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "ondansetron", Substance_B: "sodium bicarbonate", Clé_couple: "ondansetron_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "pantoprazole", Substance_B: "potassium phosphate", Clé_couple: "pantoprazole_potassium phosphate", Compatibilité: "I" },
+  { Substance_A: "pipéracilline/tazobactam", Substance_B: "vancomycine", Clé_couple: "pipéracilline/tazobactam_vancomycine", Compatibilité: "I" },
+  { Substance_A: "pipéracilline/tazobactam", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_pipéracilline/tazobactam", Compatibilité: "I" },
+  { Substance_A: "potassium phosphate", Substance_B: " TPN (avec lipides)", Clé_couple: " TPN (avec lipides)_potassium phosphate", Compatibilité: "I" },
+  { Substance_A: "propofol", Substance_B: "rocuronium", Clé_couple: "propofol_rocuronium", Compatibilité: "I" },
+  { Substance_A: "sodium bicarbonate", Substance_B: "adrénaline ", Clé_couple: "adrénaline _sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "sodium bicarbonate", Substance_B: "vancomycine", Clé_couple: "sodium bicarbonate_vancomycine", Compatibilité: "I" },
+  { Substance_A: "sodium bicarbonate", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "sodium bicarbonate", Substance_B: " TPN (avec lipides)", Clé_couple: " TPN (avec lipides)_sodium bicarbonate", Compatibilité: "I" },
+  { Substance_A: "thiopental", Substance_B: "nicardipine", Clé_couple: "nicardipine_thiopental", Compatibilité: "I" },
+  { Substance_A: "triméthoprime/sulfaméthoxazole", Substance_B: " RINGER-LACTATE", Clé_couple: " RINGER-LACTATE_triméthoprime/sulfaméthoxazole", Compatibilité: "I" },
+  { Substance_A: "triméthoprime/sulfaméthoxazole", Substance_B: " TPN (avec lipides)", Clé_couple: " TPN (avec lipides)_triméthoprime/sulfaméthoxazole", Compatibilité: "I" },
+,
+
+  ];
+
+  // ==========================================
+  // 2. PRÉPARATION DU MOTEUR & DONNÉES
+  // ==========================================
+  const normalize = (str) => str.trim().toLowerCase();
+
+  const compatibilityMap = new Map();
+  const allSubstancesSet = new Set();
+
+  rawData.forEach(row => {
+    const subA = normalize(row.Substance_A);
+    const subB = normalize(row.Substance_B);
+    
+    allSubstancesSet.add(subA);
+    allSubstancesSet.add(subB);
+
+    const canonicalKey = [subA, subB].sort().join('_');
+    compatibilityMap.set(canonicalKey, row.Compatibilité);
+  });
+
+  const availableSubstances = Array.from(allSubstancesSet).sort();
+  const selectedSubstances = new Set();
+
+  // ==========================================
+  // 3. GESTION DE LA RECHERCHE & SÉLECTION
+  // ==========================================
+  const searchInput = document.getElementById('searchInput');
+  const suggestionsBox = document.getElementById('suggestions');
+  const selectedContainer = document.getElementById('selectedContainer');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+
+  searchInput.addEventListener('input', (e) => {
+    const query = normalize(e.target.value);
+    suggestionsBox.innerHTML = '';
+
+    if (!query) {
+      suggestionsBox.style.display = 'none';
+      return;
+    }
+
+    const matches = availableSubstances.filter(sub => 
+      sub.includes(query) && !selectedSubstances.has(sub)
+    );
+
+    if (matches.length > 0) {
+      matches.forEach(match => {
+        const div = document.createElement('div');
+        div.className = 'suggestion-item';
+        div.textContent = capitalize(match);
+        div.addEventListener('click', () => addSubstance(match));
+        suggestionsBox.appendChild(div);
+      });
+      suggestionsBox.style.display = 'block';
+    } else {
+      suggestionsBox.style.display = 'none';
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+      suggestionsBox.style.display = 'none';
+    }
+  });
+
+  function addSubstance(substance) {
+    selectedSubstances.add(substance);
+    searchInput.value = '';
+    suggestionsBox.style.display = 'none';
+    renderTags();
+    resetResults();
+  }
+
+  function removeSubstance(substance) {
+    selectedSubstances.delete(substance);
+    renderTags();
+    resetResults();
+  }
+
+  function renderTags() {
+    selectedContainer.innerHTML = '';
+    selectedSubstances.forEach(sub => {
+      const tag = document.createElement('div');
+      tag.className = 'tag';
+      tag.innerHTML = `
+        ${capitalize(sub)}
+        <button onclick="removeSubstance('${sub}')">&times;</button>
+      `;
+      selectedContainer.appendChild(tag);
+    });
+
+    analyzeBtn.disabled = selectedSubstances.size < 2;
+  }
+
+  function resetResults() {
+    document.getElementById('resultCard').style.display = 'none';
+  }
+
+  function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  // ==========================================
+  // 4. MOTEUR D'ÉVALUATION DES MÉLANGES
+  // ==========================================
+  analyzeBtn.addEventListener('click', runAnalysis);
+
+  function runAnalysis() {
+    const list = Array.from(selectedSubstances);
+    const pairsResult = [];
+    
+    let countIncompatible = 0;
+    let countMissing = 0;
+
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const subA = list[i];
+        const subB = list[j];
+        const canonicalKey = [subA, subB].sort().join('_');
+        
+        let status = compatibilityMap.get(canonicalKey);
+
+        if (!status) {
+          status = 'ND';
+          countMissing++;
+        } else if (status === 'I') {
+          countIncompatible++;
+        }
+
+        pairsResult.push({ subA, subB, status });
+      }
+    }
+
+    let globalMessage = "";
+    let bannerClass = "";
+
+    if (countIncompatible > 0 && countMissing > 0) {
+      globalMessage = "Incompatible, et données manquantes";
+      bannerClass = "banner-I_ND";
+    } else if (countIncompatible > 0) {
+      globalMessage = "Incompatible";
+      bannerClass = "banner-I";
+    } else if (countMissing > 0) {
+      globalMessage = "Données manquantes";
+      bannerClass = "banner-ND";
+    } else {
+      globalMessage = "Compatible";
+      bannerClass = "banner-C";
+    }
+
+    displayResults(globalMessage, bannerClass, pairsResult);
+  }
+
+  function displayResults(message, bannerClass, pairs) {
+    const resultCard = document.getElementById('resultCard');
+    const resultBanner = document.getElementById('resultBanner');
+    const tableBody = document.getElementById('pairsTableBody');
+
+    resultBanner.textContent = message;
+    resultBanner.className = `result-banner ${bannerClass}`;
+
+    tableBody.innerHTML = '';
+    pairs.forEach(pair => {
+      const row = document.createElement('tr');
+      
+      let statusBadge = "";
+      if (pair.status === 'C') statusBadge = `<span class="status-pill pill-C">Compatible</span>`;
+      else if (pair.status === 'I') statusBadge = `<span class="status-pill pill-I">Incompatible</span>`;
+      else statusBadge = `<span class="status-pill pill-ND">Donnée manquante</span>`;
+
+      row.innerHTML = `
+        <td><strong>${capitalize(pair.subA)}</strong> & <strong>${capitalize(pair.subB)}</strong></td>
+        <td>${statusBadge}</td>
+      `;
+      tableBody.appendChild(row);
+    });
+
+    resultCard.style.display = 'block';
+  }
+
+  // ==========================================
+  // 5. MOTEUR DE GÉNÉRATION DE LA MATRICE COMPACTE
+  // ==========================================
+  const toggleMatrixBtn = document.getElementById('toggleMatrixBtn');
+  const matrixCard = document.getElementById('matrixCard');
+
+  toggleMatrixBtn.addEventListener('click', () => {
+    if (matrixCard.style.display === 'none') {
+      generateMatrix();
+      matrixCard.style.display = 'block';
+      toggleMatrixBtn.textContent = "Masquer la matrice globale";
+    } else {
+      matrixCard.style.display = 'none';
+      toggleMatrixBtn.textContent = "Générer la matrice globale";
+    }
+  });
+
+  function generateMatrix() {
+    const head = document.getElementById('matrixHead');
+    const body = document.getElementById('matrixBody');
+
+    head.innerHTML = '';
+    body.innerHTML = '';
+
+    // En-têtes de colonnes (Orientation verticale)
+    const headerRow = document.createElement('tr');
+    headerRow.innerHTML = '<th style="background:transparent;"></th>';
+    
+    availableSubstances.forEach(sub => {
+      const th = document.createElement('th');
+      th.className = 'col-header';
+      th.textContent = capitalize(sub);
+      headerRow.appendChild(th);
+    });
+    head.appendChild(headerRow);
+
+    // Lignes de la matrice
+    availableSubstances.forEach(subRow => {
+      const tr = document.createElement('tr');
+      
+      const tdHeader = document.createElement('td');
+      tdHeader.className = 'row-header';
+      tdHeader.textContent = capitalize(subRow);
+      tr.appendChild(tdHeader);
+
+      availableSubstances.forEach(subCol => {
+        const td = document.createElement('td');
+
+        if (subRow === subCol) {
+          td.className = 'cell-same';
+          td.title = `${capitalize(subRow)} (Même substance)`;
+        } else {
+          const key = [subRow, subCol].sort().join('_');
+          const status = compatibilityMap.get(key);
+
+          if (status === 'C') {
+            td.className = 'cell-C';
+            td.textContent = 'C';
+            td.title = `${capitalize(subRow)} + ${capitalize(subCol)} : Compatible`;
+          } else if (status === 'I') {
+            td.className = 'cell-I';
+            td.textContent = 'I';
+            td.title = `${capitalize(subRow)} + ${capitalize(subCol)} : Incompatible`;
+          } else {
+            td.className = 'cell-ND';
+            td.title = `${capitalize(subRow)} + ${capitalize(subCol)} : Donnée manquante`;
+          }
+        }
+
+        tr.appendChild(td);
+      });
+
+      body.appendChild(tr);
+    });
+  }
+</script>
+
+</body>
+</html>
